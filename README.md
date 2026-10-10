@@ -7,6 +7,7 @@ You can't read a screen while you're presenting, so the feedback is haptic. Each
 | You're... | Detected by | You feel | Dot |
 |---|---|---|---|
 | Saying "um", "uh", "like," | AssemblyAI live transcript | one crisp tick | main |
+| 3+ fillers within 5 s | AssemblyAI live transcript | one strong buzz: pause and breathe | main |
 | Reading notes / looking down > 2.5 s | Neon gaze + head pitch | double-double tap | main |
 | Facing one side of the room > 8 s | Neon gaze + head yaw | nudge on the *other* side | left / right |
 | Rushing (> 170 WPM) | transcript timing | fading wave + **warming** | pace |

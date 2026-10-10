@@ -20,11 +20,12 @@ def pause(seconds: float) -> int:
 
 
 # Vibration ids come from the DataFeel waveform library (datafeel.device.VibrationWaveforms):
-# 4 sharp click, 10 double click, 24 sharp tick, 70 long fade-out,
+# 4 sharp click, 10 double click, 14 strong buzz, 24 sharp tick, 70 long fade-out,
 # 74 short fade-out, 86 short swell, 90 medium swell.
 # cue -> (dot role, vibration sequence, LED color, thermal: None = unchanged, 0 = off, else -1..1)
 PATTERNS = {
     "filler":     ("main",  [4],                          (255, 130, 0), None),
+    "filler_burst": ("main", [14],                        (255, 0, 160), None),
     "look_up":    ("main",  [10, pause(0.2), 10],         (0, 90, 255),  None),
     "look_left":  ("left",  [86, 24, pause(0.08), 24],    (160, 0, 255), None),
     "look_right": ("right", [86, 24, pause(0.08), 24],    (160, 0, 255), None),

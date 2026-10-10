@@ -19,6 +19,9 @@ STUCK_SIDE_REMIND_S = 10
 
 # Fillers
 FILLER_COOLDOWN_S = 1.5  # at most one filler buzz per 1.5 s
+FILLER_BURST_COUNT = 3  # this many fillers...
+FILLER_BURST_WINDOW_S = 5  # ...within this many seconds plays one strong "pause and breathe" buzz
+FILLER_BURST_COOLDOWN_S = 10  # and the strong buzz repeats at most this often
 
 # Thermal (DataFeel). Heating runs ~1.5 C/s at full power, so keep it short.
 HEAT = 0.5  # -1 (max cooling) .. 1 (max heating)

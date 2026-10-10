@@ -176,9 +176,10 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const ICONS = { filler: "💬", look_up: "↑", look_left: "←", look_right: "→", too_fast: "»", too_slow: "«", pace_ok: "✓", start: "▶", stop: "■" };
+const ICONS = { filler: "💬", filler_burst: "‼", look_up: "↑", look_left: "←", look_right: "→", too_fast: "»", too_slow: "«", pace_ok: "✓", start: "▶", stop: "■" };
 const LESSONS = [
   ["filler", "Filler word", "one crisp tick"],
+  ["filler_burst", "Filler streak", "strong buzz: pause and breathe"],
   ["look_up", "Eyes up", "double-double tap"],
   ["look_left", "Look left", "nudge on the left dot"],
   ["look_right", "Look right", "nudge on the right dot"],
@@ -432,8 +433,8 @@ function paceChart(r) {
     penDown = true;
   }
   svg.push(`<path class="line" d="${path}"/>`);
-  for (const [t, kind] of r.cues) {
-    if (kind === "filler") svg.push(`<line class="filler" x1="${x(t)}" x2="${x(t)}" y1="${H - B}" y2="${H - B - 10}"/>`);
+  for (const [t, , filler] of r.transcript) {  // every filler said, including ones that didn't buzz
+    if (filler) svg.push(`<line class="filler" x1="${x(t)}" x2="${x(t)}" y1="${H - B}" y2="${H - B - 10}"/>`);
   }
   svg.push(`<line class="cross" id="cross" y1="${T}" y2="${H - B}" visibility="hidden"/>`);
   box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${svg.join("")}</svg><div id="tip" hidden></div>`;

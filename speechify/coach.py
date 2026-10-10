@@ -15,6 +15,7 @@ from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 
 from .config import (
+    FILLER_BURST_COOLDOWN_S, FILLER_BURST_COUNT, FILLER_BURST_WINDOW_S,
     FILLER_COOLDOWN_S, IDEAL_WPM, LOOK_DOWN_DEG, LOOK_DOWN_REMIND_S, LOOK_DOWN_S, LOOK_UP_DEG,
     PACE_REMIND_S, PACE_SUSTAIN_S, PACE_WINDOW_S, SIDE_DEG, STUCK_SIDE_REMIND_S, STUCK_SIDE_S,
     TOO_FAST_WPM, TOO_SLOW_WPM,
@@ -72,6 +73,7 @@ class Coach:
         self.words: list[Word] = []  # finished turns - the transcript
         self.partial: list[Word] = []  # the turn still being spoken (the transcriber may revise it)
         self.turn_fillers = 0  # fillers already cued in the current turn
+        self.filler_times: list[float] = []  # when each filler was heard, to spot a streak
         self.cues: list[tuple[float, str, str]] = []  # (t, kind, message)
         self.zone_time: Counter[str] = Counter()  # seconds spent in each gaze zone
         self.down_spans: list[tuple[float, float]] = []
@@ -174,10 +176,16 @@ class Coach:
             previous = words[i - 1] if i else (self.words[-1] if self.words else None)
             word.filler = filler_label(word, previous)
         fillers = [w for w in words if w.filler]
-        if len(fillers) > self.turn_fillers:  # a filler we haven't reacted to yet
-            newest = fillers[-1]
-            if newest.end - self.last_cue["filler"] >= FILLER_COOLDOWN_S:
-                self._cue(newest.end, "filler", f'Filler: "{newest.filler}"')
+        new = fillers[self.turn_fillers:]  # fillers we haven't reacted to yet
+        self.filler_times += [w.end for w in new]
+        if new:
+            t = new[-1].end
+            streak = sum(1 for heard in self.filler_times if heard > t - FILLER_BURST_WINDOW_S)
+            if streak >= FILLER_BURST_COUNT and t - self.last_cue["filler_burst"] >= FILLER_BURST_COOLDOWN_S:
+                self.last_cue["filler"] = t  # the strong buzz replaces this filler's tick
+                self._cue(t, "filler_burst", f"{streak} fillers in {FILLER_BURST_WINDOW_S}s - pause and breathe")
+            elif t - self.last_cue["filler"] >= FILLER_COOLDOWN_S:
+                self._cue(t, "filler", f'Filler: "{new[-1].filler}"')
         # Track the latest count even when it drops (a revision can remove a filler),
         # so the next filler still registers as new.
         self.turn_fillers = len(fillers)

@@ -75,9 +75,16 @@ def test_rushing_triggers_too_fast():
 
 def test_filler_cooldown():
     coach, cues = started_coach()
-    for t in (3.0, 3.5, 6.0):
+    for t in (3.0, 3.5, 9.0):
         coach.on_turn([Word("um", t, t + 0.2)], final=True)
     assert cues.count("filler") == 2  # the second "um" is within the 1.5 s cooldown
+
+
+def test_filler_streak_escalates_once():
+    coach, cues = started_coach()
+    for t in (3.0, 3.6, 4.2, 4.8):  # "um, um, um, um" in under 2 seconds
+        coach.on_turn([Word("um,", t, t + 0.2)], final=True)
+    assert cues == ["filler", "filler_burst"]  # one tick, then one strong buzz - not a buzz per "um"
 
 
 def test_filler_buzzes_before_the_turn_is_final():
@@ -98,7 +105,7 @@ def test_filler_buzzes_before_the_turn_is_final():
 def test_filler_after_a_revision_still_buzzes():
     # The transcriber sometimes drops a filler when it revises a turn; one said after that must still buzz.
     coach, cues = started_coach()
-    um, uh, so, um2 = Word("Um,", 3.0, 3.2), Word("uh,", 5.0, 5.2), Word("so", 5.0, 5.2), Word("um,", 7.0, 7.2)
+    um, uh, so, um2 = Word("Um,", 3.0, 3.2), Word("uh,", 6.0, 6.2), Word("so", 6.0, 6.2), Word("um,", 9.5, 9.7)
     coach.on_turn([um], final=False)
     coach.on_turn([um, uh], final=False)
     coach.on_turn([um, so], final=False)  # revision dropped the "uh"
