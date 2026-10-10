@@ -15,7 +15,7 @@ from .config import QUESTION_MODEL, VOICE_ID, VOICE_MODEL
 
 PROMPT = """You are in the audience of the talk below. Ask the speaker one pointed, specific \
 question about something they actually said - the kind that makes them think on their feet.
-Reply with only the question, in one or two conversational sentences.
+Reply with only the question, in one or two conversational sentences.{already_asked}
 
 Transcript:
 {transcript}"""
@@ -28,7 +28,12 @@ def _key(name: str) -> str:
     return key
 
 
-async def write_question(transcript: str) -> str:
+async def write_question(transcript: str, already_asked: list[str]) -> str:
+    avoid = ""
+    if already_asked:
+        avoid = "\nAsk about something different from these questions they already got:\n"
+        avoid += "\n".join(f"- {q}" for q in already_asked)
+    prompt = PROMPT.format(transcript=transcript, already_asked=avoid)
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(
             "https://llm-gateway.assemblyai.com/v1/chat/completions",
@@ -36,7 +41,7 @@ async def write_question(transcript: str) -> str:
             json={
                 "model": QUESTION_MODEL,
                 "max_tokens": 2000,
-                "messages": [{"role": "user", "content": PROMPT.format(transcript=transcript)}],
+                "messages": [{"role": "user", "content": prompt}],
             },
         )
     if response.status_code != 200:

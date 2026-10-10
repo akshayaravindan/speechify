@@ -140,12 +140,14 @@
   <section id="report" hidden>
     <h2 style="font-size: 18px">Your last session</h2>
     <p class="sub" id="answered"></p>
+    <p id="compare" style="font-size: 18px; font-weight: 600"></p>
     <div class="grid" id="tiles"></div>
     <div class="card"><ul id="insights"></ul></div>
     <div class="card">
       <h2>Take a question from the audience</h2>
-      <p class="sub">An AI audience member asks about what you just said, out loud. Your answer is coached like a talk.</p>
+      <p class="sub">An AI audience member asks about your talk, out loud. Your answer is coached like a talk.</p>
       <button id="ask">🎤 Ask me a question</button>
+      <button id="retry" hidden>↺ Try that question again</button>
       <p id="question" style="font-size: 18px"></p>
     </div>
     <div class="card">
@@ -189,6 +191,7 @@ const PACE_MIN = 60, PACE_MAX = 220; // range of the live pace track
 let next = 0;        // index of the next cue event we haven't shown
 let running = false;
 let limits = null;   // thresholds from the server's config.py
+let question = null; // the audience question you last answered, so you can retry it
 
 async function api(path, method = "GET") {
   const res = await fetch(path, { method });
@@ -325,12 +328,15 @@ async function toggle() {
 }
 $("go").onclick = toggle;
 
-// Audience Q&A: play the AI's question, then coach the answer as a new session.
-$("ask").onclick = async () => {
-  $("ask").disabled = true;
-  $("question").textContent = "The audience is thinking of a question...";
+// Audience Q&A: play the AI's question (a new one, or the same one again),
+// then coach the answer as a new session.
+async function takeQuestion(askNew) {
+  $("ask").disabled = $("retry").disabled = true;
   try {
-    const { question } = await api("/api/question", "POST");
+    if (askNew) {
+      $("question").textContent = "The audience is thinking of a question...";
+      question = (await api("/api/question", "POST")).question;
+    }
     $("question").textContent = `"${question}"`;
     const voice = new Audio(`/api/question.mp3?${Date.now()}`); // new URL each time, so no stale cached audio
     voice.onended = async () => { // start listening only after the voice stops, so the mic doesn't hear it
@@ -347,8 +353,10 @@ $("ask").onclick = async () => {
   } catch (err) {
     $("question").textContent = err.message;
   }
-  $("ask").disabled = false;
-};
+  $("ask").disabled = $("retry").disabled = false;
+}
+$("ask").onclick = () => takeQuestion(true);
+$("retry").onclick = () => takeQuestion(false);
 
 // ---------------------------------------------------------------- report
 
@@ -357,6 +365,14 @@ function renderReport(r) {
   $("answered").textContent = r.question ? `Your answer to: "${r.question}"` : "";
   $("question").textContent = "";
   $("asked").textContent = "";
+  question = r.question ?? null; // only an answer's report offers a retry
+  $("retry").hidden = !question;
+  const prev = r.previous_attempt;
+  const pct = (v) => `${Math.round(v * 100)}%`;
+  $("compare").textContent = prev
+    ? `vs. your last try: ${prev.fillers} → ${r.fillers} fillers · ${prev.avg_wpm ?? "-"} → ${r.avg_wpm ?? "-"} WPM`
+      + (prev.eye_contact != null && r.eye_contact != null ? ` · eye contact ${pct(prev.eye_contact)} → ${pct(r.eye_contact)}` : "")
+    : "";
   const tiles = [
     ["Average pace", r.avg_wpm ?? "-", `WPM · aim ${r.ideal_wpm[0]}-${r.ideal_wpm[1]}`],
     ["Filler words", r.fillers_per_min, `per minute · ${r.fillers} total · aim under 2`],

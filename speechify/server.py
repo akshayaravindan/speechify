@@ -9,6 +9,8 @@ The dashboard polls GET /api/state a few times a second; open it in a browser
 
 After a talk, POST /api/question has an AI audience member (qa.py) ask about it
 out loud; answering is just another session, started with /api/start?answer=true.
+Retrying replays the same question, and the new answer's report includes the
+previous try's numbers for a before/after.
 """
 
 from __future__ import annotations
@@ -37,7 +39,10 @@ SESSIONS_DIR = Path("sessions")
 status = {"glasses": "starting...", "mic_db": None, "transcription": "starting...", "haptics": "", "caption": ""}
 events: list[dict] = []  # every cue so far; the dashboard asks for the ones it hasn't seen
 session = {"audio": None, "task": None, "report": None,  # the session in progress
-           "question": None, "question_audio": None, "answering": False}  # audience Q&A
+           # Audience Q&A. Questions are always about the last talk ("talk" is its transcript);
+           # "asked" prevents repeats; "attempt" is the last answer to the current question.
+           "question": None, "question_audio": None, "answering": False,
+           "talk": "", "asked": [], "attempt": None}
 haptics = Haptics()
 
 
@@ -155,6 +160,11 @@ async def stop():
     report = coach.report()
     if session["answering"]:
         report["question"] = session["question"]
+        report["previous_attempt"] = session["attempt"]  # None on the first try
+        session["attempt"] = {k: report[k] for k in ("fillers", "avg_wpm", "eye_contact")}
+    else:  # a new talk: questions from now on are about this one
+        session["talk"] = " ".join(word for _, word, _ in report["transcript"])
+        session["asked"] = []
     SESSIONS_DIR.mkdir(exist_ok=True)
     path = SESSIONS_DIR / time.strftime("%Y-%m-%d_%H-%M-%S.json")
     path.write_text(json.dumps(report, indent=2))
@@ -172,17 +182,16 @@ def last_report():
 
 @app.post("/api/question")
 async def question():
-    """An AI audience member writes a pointed question about your last session."""
-    if session["report"] is None:
-        raise HTTPException(409, "give a talk first")
-    transcript = " ".join(word for _, word, _ in session["report"]["transcript"])
-    if not transcript:
-        raise HTTPException(409, "the last session has no transcript to ask about")
+    """An AI audience member writes a new pointed question about your last talk."""
+    if not session["talk"]:
+        raise HTTPException(409, "give a talk first (with transcription on)")
     try:
-        session["question"] = await qa.write_question(transcript)
+        session["question"] = await qa.write_question(session["talk"], session["asked"])
         session["question_audio"] = await qa.speak(session["question"])
     except Exception as e:
         raise HTTPException(502, f"couldn't get a question: {e}")
+    session["asked"].append(session["question"])
+    session["attempt"] = None  # a new question: no earlier answer to compare with
     return {"question": session["question"]}
 
 
