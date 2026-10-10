@@ -3,7 +3,7 @@
 Times are seconds from time.monotonic(). Inputs:
     on_head(t, pitch, yaw)   head orientation from the Neon IMU, degrees
     on_gaze(t, x, y, worn)   gaze point in Neon scene-camera pixels
-    on_word(word)            each finalized word from the transcriber
+    on_turn(words, final)    the sentence being spoken so far, re-sent as the transcriber revises it
 tick(t) runs the time-based rules ~10x per second. Every cue goes to
 on_cue(kind, message), which the server turns into a haptic + dashboard event.
 """
@@ -69,7 +69,9 @@ class Coach:
 
     def _reset(self, t: float) -> None:
         self.t0 = self.t_end = t
-        self.words: list[Word] = []
+        self.words: list[Word] = []  # finished turns - the transcript
+        self.partial: list[Word] = []  # the turn still being spoken (the transcriber may revise it)
+        self.turn_fillers = 0  # fillers already cued in the current turn
         self.cues: list[tuple[float, str, str]] = []  # (t, kind, message)
         self.zone_time: Counter[str] = Counter()  # seconds spent in each gaze zone
         self.down_spans: list[tuple[float, float]] = []
@@ -162,13 +164,29 @@ class Coach:
                 self.down_spans.append((self.zone_since, t))
             self.zone, self.zone_since = zone, t
 
-    def on_word(self, word: Word) -> None:
+    def on_turn(self, words: list[Word], final: bool) -> None:
+        """The words of the current turn so far. The transcriber re-sends the whole
+        turn about once a second, but only marks it final after a pause - so react
+        to fillers right away, and add words to the transcript once final."""
         if not self.active:
             return
-        word.filler = filler_label(word, self.words[-1] if self.words else None)
-        self.words.append(word)
-        if word.filler and word.end - self.last_cue["filler"] >= FILLER_COOLDOWN_S:
-            self._cue(word.end, "filler", f'Filler: "{word.filler}"')
+        for i, word in enumerate(words):
+            previous = words[i - 1] if i else (self.words[-1] if self.words else None)
+            word.filler = filler_label(word, previous)
+        fillers = [w for w in words if w.filler]
+        if len(fillers) > self.turn_fillers:  # a filler we haven't reacted to yet
+            newest = fillers[-1]
+            if newest.end - self.last_cue["filler"] >= FILLER_COOLDOWN_S:
+                self._cue(newest.end, "filler", f'Filler: "{newest.filler}"')
+        # Track the latest count even when it drops (a revision can remove a filler),
+        # so the next filler still registers as new.
+        self.turn_fillers = len(fillers)
+        if final:
+            self.words.extend(words)
+            self.partial = []
+            self.turn_fillers = 0
+        else:
+            self.partial = words
 
     # ---------------------------------------------------------------- rules
 
@@ -176,7 +194,7 @@ class Coach:
         return self.zone if now - self.gaze_t < 1 else None  # no gaze for a second = unknown
 
     def current_wpm(self, now: float) -> float | None:
-        recent = [w for w in self.words[-100:] if w.end > now - PACE_WINDOW_S and not w.filler]
+        recent = [w for w in self.words[-100:] + self.partial if w.end > now - PACE_WINDOW_S and not w.filler]
         if len(recent) < 5 or now - recent[-1].end > 3:
             return None  # not enough speech yet, or pausing (a pause isn't "slow")
         span = recent[-1].end - recent[0].start
@@ -236,7 +254,7 @@ class Coach:
             "elapsed": round((now if self.active else self.t_end) - self.t0),
             "wpm": round(self.wpm) if self.active and self.wpm else None,
             "pace": self.pace,
-            "fillers": sum(1 for w in self.words if w.filler),
+            "fillers": sum(1 for w in self.words if w.filler) + self.turn_fillers,
             "zone": zone,
             "gaze": [round(self.gaze[0], 1), round(self.gaze[1], 1)] if zone and self.gaze else None,
         }

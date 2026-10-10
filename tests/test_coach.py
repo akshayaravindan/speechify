@@ -66,7 +66,7 @@ def test_rushing_triggers_too_fast():
     coach, cues = started_coach()
     t = 2.0
     while t < 20:  # 200 words per minute
-        coach.on_word(Word("word", t, t + 0.25))
+        coach.on_turn([Word("word", t, t + 0.25)], final=True)
         coach.tick(t)
         t += 0.3
     assert "too_fast" in cues
@@ -76,8 +76,34 @@ def test_rushing_triggers_too_fast():
 def test_filler_cooldown():
     coach, cues = started_coach()
     for t in (3.0, 3.5, 6.0):
-        coach.on_word(Word("um", t, t + 0.2))
+        coach.on_turn([Word("um", t, t + 0.2)], final=True)
     assert cues.count("filler") == 2  # the second "um" is within the 1.5 s cooldown
+
+
+def test_filler_buzzes_before_the_turn_is_final():
+    # AssemblyAI re-sends the unfinished turn as it grows and only finalizes it after
+    # a pause - the buzz must not wait for that pause.
+    coach, cues = started_coach()
+    so, um, we = Word("So", 3.0, 3.2), Word("um,", 3.3, 3.6), Word("we", 3.7, 3.9)
+    coach.on_turn([so, um], final=False)
+    assert cues.count("filler") == 1  # buzzed the first time the "um" shows up
+    coach.on_turn([so, um, we], final=False)
+    coach.on_turn([so, um, we], final=True)
+    assert cues.count("filler") == 1  # the same "um" re-sent: no second buzz
+    coach.on_turn([Word("Uh,", 6.0, 6.2)], final=False)  # next turn, past the cooldown
+    assert cues.count("filler") == 2
+    assert [w.text for w in coach.words] == ["So", "um,", "we"]  # only finished turns join the transcript
+
+
+def test_filler_after_a_revision_still_buzzes():
+    # The transcriber sometimes drops a filler when it revises a turn; one said after that must still buzz.
+    coach, cues = started_coach()
+    um, uh, so, um2 = Word("Um,", 3.0, 3.2), Word("uh,", 5.0, 5.2), Word("so", 5.0, 5.2), Word("um,", 7.0, 7.2)
+    coach.on_turn([um], final=False)
+    coach.on_turn([um, uh], final=False)
+    coach.on_turn([um, so], final=False)  # revision dropped the "uh"
+    coach.on_turn([um, so, um2], final=False)
+    assert cues.count("filler") == 3
 
 
 def test_report_eye_contact():

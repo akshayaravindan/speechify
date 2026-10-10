@@ -19,7 +19,7 @@ TALK = (
     "speaker read their slides, rushed the best part, and filled every silence with noise. Speechify is a "
     "coach you wear. The glasses see when you are reading your notes instead of talking to people. The "
     "microphone hears your pace and every filler word. And instead of a screen you cannot look at, you "
-    "feel the feedback. A tick on your wrist for a filler word. A cool touch when you rush. A warm one "
+    "feel the feedback. A tick on your wrist for a filler word. A warm touch when you rush. A cool one "
     "when you drag. A nudge on the left when you have forgotten half the room. Afterwards you get the "
     "full picture: your pace over time, where you looked, and the moments that cost you. Public speaking "
     "is a skill, and skills need feedback while you are doing them, not a week later. Thank you."
@@ -48,8 +48,8 @@ async def fake_glasses(coach) -> None:
         await asyncio.sleep(1 / 60)
 
 
-async def fake_speech(on_word, on_caption, status: dict) -> None:
-    """Speak TALK once, word by word, with fillers and changing pace."""
+async def fake_speech(on_turn, on_caption, status: dict) -> None:
+    """Speak TALK once, word by word (each word its own finished turn), with fillers and changing pace."""
     rng = random.Random(4)
     start = time.monotonic()
     line: list[str] = []
@@ -60,7 +60,7 @@ async def fake_speech(on_word, on_caption, status: dict) -> None:
             t = time.monotonic() - start
             seconds = 60 / (240 if 18 <= t < 38 else 75 if 48 <= t < 66 else 145)
             now = time.monotonic()
-            on_word(Word(text, now, now + 0.8 * seconds))
+            on_turn([Word(text, now, now + 0.8 * seconds)], True)
             line = line[-11:] + [text]
             on_caption(" ".join(line))
             status["mic_db"] = round(-25 + rng.uniform(-3, 3))

@@ -10,7 +10,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import ssl
 
+import certifi
 import numpy as np
 import sounddevice as sd
 from websockets.asyncio.client import connect
@@ -43,19 +45,22 @@ def level_db(pcm: np.ndarray) -> float:
     return float(20 * np.log10(max(rms, 1e-6)))
 
 
-async def transcribe(audio: asyncio.Queue, t0: float, on_word, on_caption, status: dict) -> None:
+async def transcribe(audio: asyncio.Queue, t0: float, on_turn, on_caption, status: dict) -> None:
     """Send audio chunks from the queue (None = end of session) to AssemblyAI.
 
-    Calls on_word(Word) for each finalized word and on_caption(text) with the
-    current line. t0 is when the first queued chunk was recorded; AssemblyAI's
-    word times are milliseconds from the start of the audio we send.
+    AssemblyAI re-sends the whole turn (roughly, the current sentence) about once
+    a second while you speak, and marks it final after a pause. Each time, this
+    calls on_turn(words, final) and on_caption(text). t0 is when the first queued
+    chunk was recorded; AssemblyAI's word times are ms from the start of our audio.
     """
     key = os.environ.get("ASSEMBLYAI_API_KEY")
     if not key:
         status["transcription"] = "off - add ASSEMBLYAI_API_KEY to .env"
         return
+    # python.org's macOS Python ships without root certificates; certifi's bundle works everywhere.
+    tls = ssl.create_default_context(cafile=certifi.where())
     try:
-        async with connect(ASSEMBLYAI_URL, additional_headers={"Authorization": key}) as ws:
+        async with connect(ASSEMBLYAI_URL, additional_headers={"Authorization": key}, ssl=tls) as ws:
             status["transcription"] = "AssemblyAI live"
 
             async def send_audio():
@@ -64,17 +69,14 @@ async def transcribe(audio: asyncio.Queue, t0: float, on_word, on_caption, statu
                 await ws.send(json.dumps({"type": "Terminate"}))  # flushes the last turn
 
             sender = asyncio.create_task(send_audio())
-            finalized = {}  # turn number -> how many of its words we've passed on
+            finished_turns = set()
             async for message in ws:
                 msg = json.loads(message)
-                if msg["type"] == "Turn":
-                    words, turn = msg["words"], msg["turn_order"]
-                    n = finalized.get(turn, 0)
-                    while n < len(words) and words[n]["word_is_final"]:
-                        w = words[n]
-                        on_word(Word(w["text"], t0 + w["start"] / 1000, t0 + w["end"] / 1000))
-                        n += 1
-                    finalized[turn] = n
+                if msg["type"] == "Turn" and msg["turn_order"] not in finished_turns:
+                    words = [Word(w["text"], t0 + w["start"] / 1000, t0 + w["end"] / 1000) for w in msg["words"]]
+                    if msg["end_of_turn"]:
+                        finished_turns.add(msg["turn_order"])
+                    on_turn(words, msg["end_of_turn"])
                     on_caption(msg["transcript"])
                 elif msg["type"] == "Termination":
                     break

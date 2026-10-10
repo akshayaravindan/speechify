@@ -3,6 +3,8 @@ datafeel @ git+https://github.com/DataFeel/devkit-samples.git#subdirectory=Pytho
 fastapi>=0.115
 uvicorn[standard]>=0.30
 websockets>=15                 # AssemblyAI streaming
+certifi                        # TLS certificates (python.org's macOS Python has none)
+httpx>=0.27                    # audience Q&A: AssemblyAI LLM Gateway + ElevenLabs
 sounddevice>=0.5               # laptop microphone
 numpy>=1.26
 python-dotenv>=1.0

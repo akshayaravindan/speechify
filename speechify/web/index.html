@@ -127,6 +127,7 @@
 
   <div class="card">
     <div class="label">Live caption</div>
+    <p class="sub" id="asked"></p>
     <p id="caption"></p>
     <div class="meter" title="Microphone level"><i id="mic"></i></div>
   </div>
@@ -138,8 +139,15 @@
 
   <section id="report" hidden>
     <h2 style="font-size: 18px">Your last session</h2>
+    <p class="sub" id="answered"></p>
     <div class="grid" id="tiles"></div>
     <div class="card"><ul id="insights"></ul></div>
+    <div class="card">
+      <h2>Take a question from the audience</h2>
+      <p class="sub">An AI audience member asks about what you just said, out loud. Your answer is coached like a talk.</p>
+      <button id="ask">🎤 Ask me a question</button>
+      <p id="question" style="font-size: 18px"></p>
+    </div>
     <div class="card">
       <h2>Pace over time</h2>
       <div id="pace-chart"></div>
@@ -172,8 +180,8 @@ const LESSONS = [
   ["look_up", "Eyes up", "double-double tap"],
   ["look_left", "Look left", "nudge on the left dot"],
   ["look_right", "Look right", "nudge on the right dot"],
-  ["too_fast", "Slow down", "fading wave + cooling"],
-  ["too_slow", "Speed up", "swelling wave + warming"],
+  ["too_fast", "Slow down", "fading wave + warming"],
+  ["too_slow", "Speed up", "swelling wave + cooling"],
 ];
 const ROLES = ["main", "pace", "left", "right"];
 const PACE_MIN = 60, PACE_MAX = 220; // range of the live pace track
@@ -306,6 +314,7 @@ async function toggle() {
       const { calibrated } = await api("/api/start", "POST");
       $("report").hidden = true;
       $("cues").innerHTML = "";
+      $("asked").textContent = "";
       if (!calibrated) $("zone").textContent = "started without gaze calibration (no glasses data)";
     }
   } catch (err) {
@@ -316,10 +325,38 @@ async function toggle() {
 }
 $("go").onclick = toggle;
 
+// Audience Q&A: play the AI's question, then coach the answer as a new session.
+$("ask").onclick = async () => {
+  $("ask").disabled = true;
+  $("question").textContent = "The audience is thinking of a question...";
+  try {
+    const { question } = await api("/api/question", "POST");
+    $("question").textContent = `"${question}"`;
+    const voice = new Audio(`/api/question.mp3?${Date.now()}`); // new URL each time, so no stale cached audio
+    voice.onended = async () => { // start listening only after the voice stops, so the mic doesn't hear it
+      try {
+        await api("/api/start?answer=true", "POST");
+        $("report").hidden = true;
+        $("cues").innerHTML = "";
+        $("asked").textContent = `Answering: "${question}"`;
+      } catch (err) {
+        $("question").textContent = err.message;
+      }
+    };
+    await voice.play();
+  } catch (err) {
+    $("question").textContent = err.message;
+  }
+  $("ask").disabled = false;
+};
+
 // ---------------------------------------------------------------- report
 
 function renderReport(r) {
   $("report").hidden = false;
+  $("answered").textContent = r.question ? `Your answer to: "${r.question}"` : "";
+  $("question").textContent = "";
+  $("asked").textContent = "";
   const tiles = [
     ["Average pace", r.avg_wpm ?? "-", `WPM · aim ${r.ideal_wpm[0]}-${r.ideal_wpm[1]}`],
     ["Filler words", r.fillers_per_min, `per minute · ${r.fillers} total · aim under 2`],
@@ -357,7 +394,7 @@ function bars(rows, format) {
 
 function paceChart(r) {
   const box = $("pace-chart");
-  const W = box.clientWidth || 700, H = 220, L = 34, R = 10, T = 10, B = 26;
+  const W = box.clientWidth || 700, H = 220, L = 34, R = 24, T = 10, B = 26; // R leaves room for the last time label
   const tMax = Math.max(r.duration_s, 10);
   const yMax = Math.max(220, ...r.timeline.map(([, wpm]) => wpm || 0));
   const x = (t) => L + (t / tMax) * (W - L - R);

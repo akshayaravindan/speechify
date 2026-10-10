@@ -9,17 +9,19 @@ You can't read a screen while you're presenting, so the feedback is haptic. Each
 | Saying "um", "uh", "like," | AssemblyAI live transcript | one crisp tick | main |
 | Reading notes / looking down > 2.5 s | Neon gaze + head pitch | double-double tap | main |
 | Facing one side of the room > 8 s | Neon gaze + head yaw | nudge on the *other* side | left / right |
-| Rushing (> 170 WPM) | transcript timing | fading wave + **cooling** | pace |
-| Dragging (< 105 WPM) | transcript timing | swelling wave + **warming** | pace |
+| Rushing (> 170 WPM) | transcript timing | fading wave + **warming** | pace |
+| Dragging (< 105 WPM) | transcript timing | swelling wave + **cooling** | pace |
 
 The dashboard's **Learn the haptic language** buttons play each pattern so you can learn them before you speak. After a session you get your pace over time, eye contact, where you looked, every filler word in the transcript, and every cue you felt.
+
+Then press **Ask me a question**: an AI audience member asks a pointed question about what you just said, out loud, and your answer is coached the same way - Q&A is where filler words pile up.
 
 ## Run it
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env            # add your ASSEMBLYAI_API_KEY
+cp .env.example .env            # add ASSEMBLYAI_API_KEY (and ELEVENLABS_API_KEY for Q&A)
 
 python -m speechify --sim all   # no hardware: fake glasses + fake speaker
 python -m speechify --sim glasses   # real mic + transcription, fake glasses
@@ -31,7 +33,7 @@ The dashboard opens at http://localhost:8000. Press **Start**, look at your audi
 ### Hardware checklist
 
 - **Neon glasses**: plug the glasses into the Companion phone, open the Neon Companion app, and put the phone on the same Wi-Fi as the laptop. If it isn't found automatically (venue Wi-Fi often blocks discovery), run with `--neon-ip <phone IP>` (shown in the app) or set `NEON_IP` in `.env`. A phone hotspot shared by both devices also works.
-- **DataFeel dots**: connect the El Jefe controller to the laptop over USB-C. 1-4 dots are detected automatically; with 4, the chain order is main, pace, left, right (edit `LAYOUTS` in `haptics.py` to change). With no dots plugged in, cues still show on the dashboard.
+- **DataFeel dots**: connect the El Jefe controller to the laptop over USB-C. 1-4 dots are detected automatically (plug in before starting the app) and get roles by their address - with four: 1 main, 2 pace, 3 left, 4 right. The practice buttons show which physical dot is which; edit `LAYOUTS` in `haptics.py` to change. With no dots plugged in, cues still show on the dashboard.
 - **Microphone**: the laptop mic. On macOS, allow microphone access for your terminal (System Settings > Privacy & Security > Microphone); the dashboard's caption bar stays empty without it.
 - **Filler words**: AssemblyAI's Universal-3.6 Pro streaming model transcribes verbatim. Say "um" in a test run and check it appears in the live caption.
 
@@ -50,6 +52,7 @@ or fakes of both (simulator.py) --'                       '----> dashboard (web/
 | `speechify/neon.py` | Neon real-time API: gaze + IMU head orientation, auto-reconnect |
 | `speechify/audio.py` | Laptop mic + AssemblyAI streaming websocket |
 | `speechify/haptics.py` | Cue -> vibration/LED/thermal patterns, DataFeel worker thread |
+| `speechify/qa.py` | Audience Q&A: question from AssemblyAI's LLM Gateway, voice from ElevenLabs |
 | `speechify/simulator.py` | Fake glasses and fake speaker with scripted mistakes |
 | `speechify/server.py` | FastAPI server and wiring |
 | `speechify/web/index.html` | The dashboard (plain HTML/JS, no build step) |
@@ -65,4 +68,4 @@ Where you're looking = where your head points (IMU) + where your eyes point with
 
 ## Credits
 
-Built during INTERFACE (SF Tech Week 2026). Uses [pupil-labs-realtime-api](https://github.com/pupil-labs/pl-realtime-api) (Neon), the [DataFeel devkit SDK](https://github.com/DataFeel/devkit-samples) (dots), [AssemblyAI](https://www.assemblyai.com/docs/streaming) streaming speech-to-text, FastAPI, uvicorn, sounddevice, numpy and websockets.
+Built during INTERFACE (SF Tech Week 2026). Uses [pupil-labs-realtime-api](https://github.com/pupil-labs/pl-realtime-api) (Neon), the [DataFeel devkit SDK](https://github.com/DataFeel/devkit-samples) (dots), [AssemblyAI](https://www.assemblyai.com/docs/streaming) streaming speech-to-text and LLM Gateway, [ElevenLabs](https://elevenlabs.io/docs) text-to-speech, FastAPI, uvicorn, sounddevice, numpy, websockets and httpx.

@@ -6,6 +6,9 @@
 
 The dashboard polls GET /api/state a few times a second; open it in a browser
 (or curl it) to see exactly what the app sees.
+
+After a talk, POST /api/question has an AI audience member (qa.py) ask about it
+out loud; answering is just another session, started with /api/start?answer=true.
 """
 
 from __future__ import annotations
@@ -18,9 +21,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
-from . import audio, config, neon, simulator
+from . import audio, config, neon, qa, simulator
 from .coach import Coach
 from .haptics import PATTERNS, Haptics
 
@@ -33,7 +36,8 @@ SESSIONS_DIR = Path("sessions")
 
 status = {"glasses": "starting...", "mic_db": None, "transcription": "starting...", "haptics": "", "caption": ""}
 events: list[dict] = []  # every cue so far; the dashboard asks for the ones it hasn't seen
-session = {"audio": None, "task": None, "report": None}  # the session in progress
+session = {"audio": None, "task": None, "report": None,  # the session in progress
+           "question": None, "question_audio": None, "answering": False}  # audience Q&A
 haptics = Haptics()
 
 
@@ -114,18 +118,20 @@ def state(since: int = 0):
 
 
 @app.post("/api/start")
-async def start():
+async def start(answer: bool = False):
+    """Start a session. answer=true means you're answering the audience question."""
     if coach.active:
         raise HTTPException(409, "a session is already running")
+    session["answering"] = answer
     now = time.monotonic()
     calibrated = coach.start(now)  # whatever you looked at for the last 2 s = the audience
     haptics.play("start")
     if SIM in ("all", "speech"):
-        session["task"] = asyncio.create_task(simulator.fake_speech(coach.on_word, on_caption, status))
+        session["task"] = asyncio.create_task(simulator.fake_speech(coach.on_turn, on_caption, status))
     else:
         session["audio"] = asyncio.Queue()
         session["task"] = asyncio.create_task(
-            audio.transcribe(session["audio"], now, coach.on_word, on_caption, status))
+            audio.transcribe(session["audio"], now, coach.on_turn, on_caption, status))
     return {"calibrated": calibrated}
 
 
@@ -147,6 +153,8 @@ async def stop():
     status["caption"] = ""
 
     report = coach.report()
+    if session["answering"]:
+        report["question"] = session["question"]
     SESSIONS_DIR.mkdir(exist_ok=True)
     path = SESSIONS_DIR / time.strftime("%Y-%m-%d_%H-%M-%S.json")
     path.write_text(json.dumps(report, indent=2))
@@ -160,6 +168,29 @@ def last_report():
     if session["report"] is None:
         raise HTTPException(404, "no finished session yet")
     return session["report"]
+
+
+@app.post("/api/question")
+async def question():
+    """An AI audience member writes a pointed question about your last session."""
+    if session["report"] is None:
+        raise HTTPException(409, "give a talk first")
+    transcript = " ".join(word for _, word, _ in session["report"]["transcript"])
+    if not transcript:
+        raise HTTPException(409, "the last session has no transcript to ask about")
+    try:
+        session["question"] = await qa.write_question(transcript)
+        session["question_audio"] = await qa.speak(session["question"])
+    except Exception as e:
+        raise HTTPException(502, f"couldn't get a question: {e}")
+    return {"question": session["question"]}
+
+
+@app.get("/api/question.mp3")
+def question_audio():
+    if session["question_audio"] is None:
+        raise HTTPException(404, "no question yet")
+    return Response(session["question_audio"], media_type="audio/mpeg")
 
 
 @app.post("/api/haptics/{kind}")

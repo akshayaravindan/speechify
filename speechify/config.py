@@ -24,3 +24,8 @@ FILLER_COOLDOWN_S = 1.5  # at most one filler buzz per 1.5 s
 HEAT = 0.5  # -1 (max cooling) .. 1 (max heating)
 COOL = -0.8
 THERMAL_MAX_S = 8
+
+# Audience Q&A (qa.py)
+QUESTION_MODEL = "qwen3.5-4b-32k-fast"  # AssemblyAI's own model; the only one free-credit accounts can use
+VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"  # ElevenLabs "George"; any voice id from your ElevenLabs library works
+VOICE_MODEL = "eleven_v3"  # expressive; "eleven_flash_v2_5" is faster
