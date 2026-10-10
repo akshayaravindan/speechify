@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speechify</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11, 11, 11, 0.10);
+    --series: #2a78d6; --good: #0ca30c; --warning: #fab219; --critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10); --series: #3987e5;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 16px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+  .chip { font-size: 12px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 99px;
+          background: var(--surface); color: var(--ink-2); }
+  .chip::before { content: "●"; margin-right: 5px; color: var(--good); }
+  .chip.warn::before { color: var(--warning); }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--border);
+           background: var(--surface); color: var(--ink); padding: 6px 12px; }
+  #go { background: var(--series); color: #fff; border: none; font-weight: 600; font-size: 16px; padding: 10px 22px; }
+  #go.stop { background: var(--critical); }
+  .banner { background: var(--warning); color: #0b0b0b; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .grid .card { margin-bottom: 0; }
+  .label { color: var(--ink-2); font-size: 13px; }
+  .value { font-size: 44px; font-weight: 600; line-height: 1.15; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .track { position: relative; height: 8px; background: var(--grid); border-radius: 4px; margin: 14px 0 4px; }
+  .track .ideal { position: absolute; top: 0; bottom: 0; background: var(--good); opacity: 0.35; border-radius: 4px; }
+  .track .needle { position: absolute; top: -5px; width: 4px; height: 18px; margin-left: -2px; background: var(--ink); border-radius: 2px; }
+  #room { width: 100%; display: block; }
+  #room rect { fill: none; stroke: var(--axis); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  #room rect.down { fill: var(--warning); fill-opacity: 0.12; stroke: none; }
+  #room text { fill: var(--muted); font-size: 4px; }
+  #room circle { fill: var(--series); stroke: var(--surface); stroke-width: 0.8; }
+  .dots { display: flex; gap: 14px; margin: 4px 0 10px; }
+  .dot { text-align: center; font-size: 12px; color: var(--ink-2); }
+  .dot span { display: block; width: 30px; height: 30px; margin: 0 auto 3px; border-radius: 50%;
+              background: var(--grid); transition: background 0.3s; }
+  .dot span.buzz { animation: buzz 0.6s; }
+  @keyframes buzz { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
+  #cues, #cue-log { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+  #cues li, #cue-log li { padding: 3px 0; border-top: 1px solid var(--border); }
+  .t { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px; }
+  #caption { min-height: 1.5em; margin: 4px 0 0; font-size: 18px; }
+  .meter { height: 4px; background: var(--grid); border-radius: 2px; margin-top: 8px; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--series); border-radius: 2px; }
+  .learn { display: flex; flex-wrap: wrap; gap: 8px; }
+  #overlay { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.75);
+             color: #fff; font-size: 40px; font-weight: 600; text-align: center; padding: 16px; }
+  .bar-row { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: 8px; margin: 6px 0; font-size: 14px; }
+  .bar { display: flex; align-items: center; gap: 6px; }
+  .bar i { height: 14px; min-width: 2px; background: var(--series); border-radius: 0 4px 4px 0; }
+  #insights { margin: 0; padding-left: 18px; }
+  #insights li { margin: 4px 0; }
+  mark { background: var(--warning); color: #0b0b0b; border-radius: 3px; padding: 0 2px; }
+  #pace-chart { position: relative; }
+  #pace-chart svg { display: block; width: 100%; }
+  #pace-chart .gridline { stroke: var(--grid); }
+  #pace-chart .axis { stroke: var(--axis); }
+  #pace-chart .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  #pace-chart .ideal { fill: var(--good); fill-opacity: 0.12; }
+  #pace-chart .down { fill: var(--warning); fill-opacity: 0.22; }
+  #pace-chart .line { fill: none; stroke: var(--series); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  #pace-chart .filler { stroke: var(--ink-2); stroke-width: 2; }
+  #pace-chart .cross { stroke: var(--axis); }
+  #tip { position: absolute; top: 0; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+         border-radius: 6px; padding: 3px 8px; font-size: 13px; white-space: nowrap; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--ink-2); margin-top: 6px; }
+  .key { display: inline-block; width: 14px; height: 10px; margin-right: 5px; vertical-align: -1px; border-radius: 2px; }
+  table { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  td, th { padding: 2px 12px 2px 0; text-align: left; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Speechify</h1>
+    <div class="chips" id="chips"></div>
+    <span class="value" id="timer" style="font-size: 22px"></span>
+    <button id="go">Start</button>
+  </header>
+  <div class="banner" id="sim-banner" hidden></div>
+  <div class="banner" id="offline" hidden>Can't reach the Speechify server - is it still running?</div>
+
+  <section class="grid">
+    <div class="card">
+      <div class="label">Pace</div>
+      <div class="value" id="wpm">-</div>
+      <div class="sub" id="pace-state">words per minute</div>
+      <div class="track"><div class="ideal" id="ideal"></div><div class="needle" id="needle" hidden></div></div>
+      <div class="sub" id="pace-range"></div>
+    </div>
+    <div class="card">
+      <div class="label">Filler words</div>
+      <div class="value" id="fillers">0</div>
+      <div class="sub" id="last-filler">"um", "uh", "like," ...</div>
+    </div>
+    <div class="card">
+      <div class="label">Where you're looking</div>
+      <svg id="room" viewBox="0 0 100 70" role="img" aria-label="Gaze position"></svg>
+      <div class="sub" id="zone">no gaze data</div>
+    </div>
+    <div class="card">
+      <div class="label">Haptic dots</div>
+      <div class="dots" id="dots"></div>
+      <ol id="cues"></ol>
+    </div>
+  </section>
+
+  <div class="card">
+    <div class="label">Live caption</div>
+    <p id="caption"></p>
+    <div class="meter" title="Microphone level"><i id="mic"></i></div>
+  </div>
+
+  <div class="card">
+    <h2>Learn the haptic language before you speak</h2>
+    <div class="learn" id="learn"></div>
+  </div>
+
+  <section id="report" hidden>
+    <h2 style="font-size: 18px">Your last session</h2>
+    <div class="grid" id="tiles"></div>
+    <div class="card"><ul id="insights"></ul></div>
+    <div class="card">
+      <h2>Pace over time</h2>
+      <div id="pace-chart"></div>
+      <div class="legend">
+        <span><i class="key" style="background: var(--series); height: 3px; vertical-align: 3px"></i>Pace (WPM)</span>
+        <span><i class="key" style="background: var(--good); opacity: 0.25"></i>Ideal range</span>
+        <span><i class="key" style="background: var(--warning); opacity: 0.4"></i>Looking down</span>
+        <span><i class="key" style="background: var(--ink-2); width: 3px"></i>Filler word</span>
+      </div>
+      <details><summary class="sub">Data table</summary><table id="pace-table"></table></details>
+    </div>
+    <div class="grid">
+      <div class="card"><h2>Where you looked</h2><div id="gaze-bars"></div></div>
+      <div class="card"><h2>Filler words</h2><div id="filler-bars"></div></div>
+    </div>
+    <div class="card"><h2>Transcript</h2><p id="transcript"></p></div>
+    <div class="card"><h2>Every cue you felt</h2><ol id="cue-log"></ol><p class="sub" id="saved"></p></div>
+  </section>
+</main>
+<div id="overlay" hidden></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const ICONS = { filler: "💬", look_up: "↑", look_left: "←", look_right: "→", too_fast: "»", too_slow: "«", pace_ok: "✓", start: "▶", stop: "■" };
+const LESSONS = [
+  ["filler", "Filler word", "one crisp tick"],
+  ["look_up", "Eyes up", "double-double tap"],
+  ["look_left", "Look left", "nudge on the left dot"],
+  ["look_right", "Look right", "nudge on the right dot"],
+  ["too_fast", "Slow down", "fading wave + cooling"],
+  ["too_slow", "Speed up", "swelling wave + warming"],
+];
+const ROLES = ["main", "pace", "left", "right"];
+const PACE_MIN = 60, PACE_MAX = 220; // range of the live pace track
+
+let next = 0;        // index of the next cue event we haven't shown
+let running = false;
+let limits = null;   // thresholds from the server's config.py
+
+async function api(path, method = "GET") {
+  const res = await fetch(path, { method });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.detail || res.statusText);
+  return body;
+}
+
+// ---------------------------------------------------------------- live view
+
+async function poll() {
+  try {
+    const s = await api(`/api/state?since=${next}`);
+    $("offline").hidden = true;
+    if (!limits) setup(s);
+    next = s.next;
+    running = s.live.active;
+    renderStatus(s);
+    renderLive(s.live, s.status);
+    s.events.forEach(showCue);
+  } catch {
+    $("offline").hidden = false;
+  }
+  setTimeout(poll, 250);
+}
+
+function setup(s) {
+  limits = s.limits;
+  const pct = (wpm) => (100 * (wpm - PACE_MIN)) / (PACE_MAX - PACE_MIN);
+  $("ideal").style.left = `${pct(limits.ideal[0])}%`;
+  $("ideal").style.width = `${pct(limits.ideal[1]) - pct(limits.ideal[0])}%`;
+  $("pace-range").textContent = `aim for ${limits.ideal[0]}-${limits.ideal[1]}; cue below ${limits.slow} or above ${limits.fast}`;
+  // The "room": x = degrees left/right of your audience, y = degrees up/down. 0,0 is where you calibrated.
+  const x = (az) => az + 50, y = (el) => 30 - el;
+  $("room").innerHTML = `
+    <rect class="down" x="0" y="${y(limits.down)}" width="100" height="${70 - y(limits.down)}"/>
+    <rect x="${x(-limits.side)}" y="${y(limits.up)}" width="${2 * limits.side}" height="${limits.up - limits.down}"/>
+    <text x="2" y="6">left</text><text x="88" y="6">right</text>
+    <text x="${x(0) - 6}" y="${y(limits.up) - 2}">audience</text>
+    <text x="${x(0) - 8}" y="67">notes / floor</text>
+    <circle id="gaze" r="2.6" cx="50" cy="30" visibility="hidden"/>`;
+  $("learn").innerHTML = LESSONS.map(([kind, name, feel]) =>
+    `<button data-kind="${kind}">${ICONS[kind]} ${name} <span class="sub">${feel}</span></button>`).join("");
+  $("learn").onclick = (e) => {
+    const button = e.target.closest("button");
+    if (button) api(`/api/haptics/${button.dataset.kind}`, "POST");
+  };
+  $("dots").innerHTML = ROLES.map((role) => `<div class="dot"><span id="dot-${role}"></span>${role}</div>`).join("");
+  if (s.sim) {
+    $("sim-banner").hidden = false;
+    $("sim-banner").textContent = `Simulation mode (--sim ${s.sim}): the ${s.sim === "all" ? "glasses and speech are" : s.sim + " is"} simulated, not real sensor data.`;
+  }
+}
+
+function renderStatus(s) {
+  const st = s.status;
+  const chips = [
+    ["Glasses", st.glasses],
+    ["Transcription", st.transcription],
+    ["Haptics", st.haptics],
+  ];
+  const bad = /error|not |off|no |search|start/i;
+  $("chips").innerHTML = chips.map(([name, text]) =>
+    `<span class="chip ${bad.test(text) ? "warn" : ""}">${name}: ${esc(text)}</span>`).join("");
+  $("mic").style.width = st.mic_db == null ? "0" : `${Math.max(0, Math.min(100, (st.mic_db + 60) * 2))}%`;
+  $("caption").textContent = st.caption || "";
+  $("go").textContent = running ? "Stop" : "Start";
+  $("go").classList.toggle("stop", running);
+  $("timer").textContent = running ? clock(s.live.elapsed) : "";
+}
+
+function renderLive(live) {
+  $("wpm").textContent = live.wpm ?? "-";
+  $("pace-state").textContent = { ok: "✓ on pace", fast: "▲ too fast", slow: "▼ too slow" }[live.pace];
+  $("needle").hidden = live.wpm == null;
+  if (live.wpm != null) {
+    const pct = (100 * (live.wpm - PACE_MIN)) / (PACE_MAX - PACE_MIN);
+    $("needle").style.left = `${Math.max(0, Math.min(100, pct))}%`;
+  }
+  $("fillers").textContent = live.fillers;
+  const dot = $("gaze");
+  if (dot && live.gaze) {
+    const [az, el] = live.gaze;
+    dot.setAttribute("cx", Math.max(2, Math.min(98, az + 50)));
+    dot.setAttribute("cy", Math.max(2, Math.min(68, 30 - el)));
+  }
+  if (dot) dot.setAttribute("visibility", live.gaze ? "visible" : "hidden");
+  $("zone").textContent = live.zone ? `looking ${live.zone === "center" ? "at the audience" : live.zone}` : "no gaze data";
+}
+
+function showCue(e) {
+  if (e.kind === "filler") $("last-filler").textContent = e.text;
+  const li = document.createElement("li");
+  li.innerHTML = `<span class="t">${e.t == null ? "practice" : clock(e.t)}</span>${ICONS[e.kind] || ""} ${esc(e.text)}`;
+  $("cues").prepend(li);
+  while ($("cues").children.length > 6) $("cues").lastChild.remove();
+  // Mirror what the physical dots do: LED color + a shake.
+  for (const role of e.role === "all" ? ROLES : [e.role]) {
+    const span = $(`dot-${role}`);
+    if (!span) continue;
+    span.style.background = e.color ? `rgb(${e.color})` : "";
+    span.classList.remove("buzz");
+    void span.offsetWidth; // restart the animation
+    span.classList.add("buzz");
+  }
+}
+
+// ---------------------------------------------------------------- start / stop
+
+async function toggle() {
+  $("go").disabled = true;
+  try {
+    if (running) {
+      renderReport(await api("/api/stop", "POST"));
+    } else {
+      // Whatever you look at during the countdown becomes "the audience" (gaze calibration).
+      for (const n of [3, 2, 1]) {
+        $("overlay").hidden = false;
+        $("overlay").textContent = `Look at your audience... ${n}`;
+        await sleep(1000);
+      }
+      $("overlay").hidden = true;
+      const { calibrated } = await api("/api/start", "POST");
+      $("report").hidden = true;
+      $("cues").innerHTML = "";
+      if (!calibrated) $("zone").textContent = "started without gaze calibration (no glasses data)";
+    }
+  } catch (err) {
+    alert(err.message);
+  }
+  $("overlay").hidden = true;
+  $("go").disabled = false;
+}
+$("go").onclick = toggle;
+
+// ---------------------------------------------------------------- report
+
+function renderReport(r) {
+  $("report").hidden = false;
+  const tiles = [
+    ["Average pace", r.avg_wpm ?? "-", `WPM · aim ${r.ideal_wpm[0]}-${r.ideal_wpm[1]}`],
+    ["Filler words", r.fillers_per_min, `per minute · ${r.fillers} total · aim under 2`],
+    ["Eye contact", r.eye_contact == null ? "-" : `${Math.round(r.eye_contact * 100)}%`,
+      r.gaze_tracked ? `looked down ${r.down_spans.length}x` : "no gaze data"],
+    ["Duration", clock(r.duration_s), `${r.words} words`],
+  ];
+  $("tiles").innerHTML = tiles.map(([label, value, sub]) =>
+    `<div class="card"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`).join("");
+  $("insights").innerHTML = r.insights.map((line) => `<li>${esc(line)}</li>`).join("") || "<li>Not enough data yet - speak for a bit longer.</li>";
+  paceChart(r);
+  $("pace-table").innerHTML = "<tr><th>Time</th><th>WPM</th><th>Looking</th></tr>" + r.timeline
+    .filter((row, i) => i % 5 === 0)
+    .map(([t, wpm, zone]) => `<tr><td>${clock(t)}</td><td>${wpm ?? "-"}</td><td>${zone ?? "-"}</td></tr>`).join("");
+  const share = r.gaze_share || {};
+  $("gaze-bars").innerHTML = r.gaze_tracked
+    ? bars(["center", "left", "right", "down", "up"].map((z) => [z, share[z]]), (v) => `${Math.round(v * 100)}%`)
+    : '<p class="sub">No gaze data in this session.</p>';
+  $("filler-bars").innerHTML = r.filler_counts.length
+    ? bars(r.filler_counts, (v) => v)
+    : '<p class="sub">None. Excellent.</p>';
+  $("transcript").innerHTML = r.transcript.map(([t, word, filler]) => (filler ? `<mark>${esc(word)}</mark>` : esc(word))).join(" ")
+    || '<span class="sub">No transcript.</span>';
+  $("cue-log").innerHTML = r.cues.map(([t, kind, text]) =>
+    `<li><span class="t">${clock(t)}</span>${ICONS[kind] || ""} ${esc(text)}</li>`).join("") || "<li>No cues - clean run!</li>";
+  $("saved").textContent = r.saved_to ? `Saved to ${r.saved_to}` : "";
+  $("report").scrollIntoView({ behavior: "smooth" });
+}
+
+function bars(rows, format) {
+  const max = Math.max(...rows.map(([, v]) => v), 1e-9);
+  return rows.map(([label, v]) => `<div class="bar-row"><span>${esc(label)}</span>
+    <div class="bar"><i style="width: ${(85 * v) / max}%"></i><b>${format(v)}</b></div></div>`).join("");
+}
+
+function paceChart(r) {
+  const box = $("pace-chart");
+  const W = box.clientWidth || 700, H = 220, L = 34, R = 10, T = 10, B = 26;
+  const tMax = Math.max(r.duration_s, 10);
+  const yMax = Math.max(220, ...r.timeline.map(([, wpm]) => wpm || 0));
+  const x = (t) => L + (t / tMax) * (W - L - R);
+  const y = (wpm) => T + (1 - wpm / yMax) * (H - T - B);
+  const svg = [];
+  for (let w = 0; w <= yMax; w += 50) {
+    svg.push(`<line class="${w ? "gridline" : "axis"}" x1="${L}" x2="${W - R}" y1="${y(w)}" y2="${y(w)}"/>`,
+             `<text class="tick" x="${L - 6}" y="${y(w) + 4}" text-anchor="end">${w}</text>`);
+  }
+  const step = tMax > 240 ? 60 : tMax > 90 ? 30 : 10;
+  for (let t = 0; t <= tMax; t += step) svg.push(`<text class="tick" x="${x(t)}" y="${H - 8}" text-anchor="middle">${clock(t)}</text>`);
+  const [lo, hi] = r.ideal_wpm;
+  svg.push(`<rect class="ideal" x="${L}" y="${y(hi)}" width="${W - L - R}" height="${y(lo) - y(hi)}"/>`);
+  for (const [a, b] of r.down_spans) svg.push(`<rect class="down" x="${x(a)}" y="${T}" width="${Math.max(x(b) - x(a), 2)}" height="${H - T - B}"/>`);
+  let path = "", penDown = false;
+  for (const [t, wpm] of r.timeline) {
+    if (wpm == null) { penDown = false; continue; }  // gap while pausing
+    path += `${penDown ? "L" : "M"}${x(t).toFixed(1)},${y(wpm).toFixed(1)}`;
+    penDown = true;
+  }
+  svg.push(`<path class="line" d="${path}"/>`);
+  for (const [t, kind] of r.cues) {
+    if (kind === "filler") svg.push(`<line class="filler" x1="${x(t)}" x2="${x(t)}" y1="${H - B}" y2="${H - B - 10}"/>`);
+  }
+  svg.push(`<line class="cross" id="cross" y1="${T}" y2="${H - B}" visibility="hidden"/>`);
+  box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${svg.join("")}</svg><div id="tip" hidden></div>`;
+
+  // Hover: crosshair + readout for the nearest second.
+  box.onmousemove = (e) => {
+    const px = e.clientX - box.getBoundingClientRect().left;
+    const t = ((px - L) / (W - L - R)) * tMax;
+    const row = r.timeline.reduce((best, p) => (Math.abs(p[0] - t) < Math.abs(best[0] - t) ? p : best), r.timeline[0]);
+    if (!row) return;
+    $("cross").setAttribute("x1", x(row[0]));
+    $("cross").setAttribute("x2", x(row[0]));
+    $("cross").setAttribute("visibility", "visible");
+    $("tip").hidden = false;
+    $("tip").textContent = `${clock(row[0])} · ${row[1] ?? "-"} WPM · looking ${row[2] ?? "?"}`;
+    $("tip").style.left = `${Math.min(x(row[0]) + 8, W - 190)}px`;
+  };
+  box.onmouseleave = () => { $("tip").hidden = true; $("cross").setAttribute("visibility", "hidden"); };
+}
+
+api("/api/report").then(renderReport).catch(() => {});
+poll();
+</script>
+</body>
+</html>

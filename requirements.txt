@@ -1,0 +1,9 @@
+pupil-labs-realtime-api>=1.9   # Neon glasses (gaze + IMU)
+datafeel @ git+https://github.com/DataFeel/devkit-samples.git#subdirectory=Python   # DataFeel dots
+fastapi>=0.115
+uvicorn[standard]>=0.30
+websockets>=15                 # AssemblyAI streaming
+sounddevice>=0.5               # laptop microphone
+numpy>=1.26
+python-dotenv>=1.0
+pytest>=8
