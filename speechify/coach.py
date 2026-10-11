@@ -280,6 +280,7 @@ class Coach:
             "pace": self.pace,
             "fillers": sum(1 for w in self.words if w.filler) + self.turn_fillers,
             "zone": zone,
+            "zone_s": round(now - self.zone_since, 1) if zone else 0,  # how long you've been in this zone
             "gaze": [round(self.gaze[0], 1), round(self.gaze[1], 1)] if zone and self.gaze else None,
             "head": [round(self.head_dir[0], 1), round(self.head_dir[1], 1)] if zone else None,
         }

@@ -10,21 +10,30 @@
     --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
     --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11, 11, 11, 0.10);
     --series: #2a78d6; --good: #0ca30c; --warning: #fab219; --critical: #d03b3b;
+    --glow: #dbe8fb; --cold: #2a78d6; --hot: #e34948;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       color-scheme: dark;
       --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7;
       --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10); --series: #3987e5;
+      --glow: #172440; --cold: #3987e5; --hot: #e66767;
     }
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  body { margin: 0; background: var(--page); color: var(--ink);
+  body { margin: 0; min-height: 100vh; color: var(--ink);
+         background: radial-gradient(1100px 520px at 50% -12%, var(--glow), transparent 70%), var(--page);
          font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 1080px; margin: 0 auto; padding: 16px; }
-  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
-  h1 { font-size: 22px; margin: 0; }
+  main { max-width: 1180px; margin: 0 auto; padding: 18px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 28px; margin: 0; letter-spacing: -0.02em;
+       background: linear-gradient(90deg, var(--series), #8b5cf6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tagline { color: var(--muted); font-size: 13px; }
+  .badge { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; padding: 3px 8px; border-radius: 6px; background: var(--warning); color: #0b0b0b; }
+  .rec { font-weight: 700; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .rec::before { content: "●"; color: var(--critical); margin-right: 6px; animation: blink 1.2s infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
   h2 { font-size: 15px; margin: 0 0 10px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
   .chip { font-size: 12px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 99px;
@@ -39,28 +48,46 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-bottom: 12px; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
   .grid .card { margin-bottom: 0; }
-  .label { color: var(--ink-2); font-size: 13px; }
+  .label { color: var(--ink-2); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
   .value { font-size: 44px; font-weight: 600; line-height: 1.15; }
+  .hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-bottom: 14px; }
+  .hero .value { font-size: 72px; font-weight: 700; letter-spacing: -0.02em; }
+  .pop { animation: pop 0.4s; }
+  @keyframes pop { 50% { transform: scale(1.18); } }
   .sub { color: var(--muted); font-size: 13px; }
-  .track { position: relative; height: 8px; background: var(--grid); border-radius: 4px; margin: 14px 0 4px; }
-  .track .ideal { position: absolute; top: 0; bottom: 0; background: var(--good); opacity: 0.35; border-radius: 4px; }
-  .track .needle { position: absolute; top: -5px; width: 4px; height: 18px; margin-left: -2px; background: var(--ink); border-radius: 2px; }
+  .track { position: relative; height: 12px; border-radius: 6px; margin: 16px 0 6px; } /* gradient set from the limits */
+  .track .needle { position: absolute; top: -6px; width: 6px; height: 24px; margin-left: -3px; background: var(--ink);
+                   border-radius: 3px; box-shadow: 0 0 0 2px var(--surface); transition: left 0.3s; }
+  .scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+  .dwell { height: 6px; background: var(--grid); border-radius: 3px; overflow: hidden; margin: 6px 0 4px; }
+  .dwell i { display: block; height: 100%; width: 0; background: var(--warning); transition: width 0.25s linear; }
+  .dwell i.full { background: var(--critical); }
   #room { width: 100%; display: block; }
   #room rect { fill: none; stroke: var(--axis); stroke-width: 1; vector-effect: non-scaling-stroke; }
   #room rect.down { fill: var(--warning); fill-opacity: 0.12; stroke: none; }
   #room text { fill: var(--muted); font-size: 4px; }
   #room circle { fill: var(--series); stroke: var(--surface); stroke-width: 0.8; }
   #room circle#head { fill: none; stroke: var(--ink-2); stroke-width: 0.7; }
-  .dots { display: flex; gap: 14px; margin: 4px 0 10px; }
-  .dot { text-align: center; font-size: 12px; color: var(--ink-2); }
-  .dot span { display: block; width: 30px; height: 30px; margin: 0 auto 3px; border-radius: 50%;
+  .dots { display: flex; gap: 22px; margin: 8px 0 12px; }
+  .dot { text-align: center; font-size: 12px; color: var(--ink-2); min-width: 64px; }
+  .dot span { display: block; width: 44px; height: 44px; margin: 0 auto 4px; border-radius: 50%;
               background: var(--grid); transition: background 0.3s; }
-  .dot span.buzz { animation: buzz 0.6s; }
-  @keyframes buzz { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
+  .dot span.buzz { animation: buzz 0.7s; }
+  @keyframes buzz { 0% { box-shadow: 0 0 0 0 var(--cue); } 20%, 60% { transform: translateX(-3px); }
+                    40%, 80% { transform: translateX(3px); } 100% { transform: none; box-shadow: 0 0 0 22px transparent; } }
+  #flash { position: fixed; bottom: 28px; left: 50%; z-index: 10; display: flex; align-items: center; gap: 16px;
+           padding: 14px 24px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border);
+           box-shadow: 0 0 0 3px var(--cue), 0 16px 48px rgba(0, 0, 0, 0.4); font-size: 24px; font-weight: 600;
+           max-width: 92vw; opacity: 0; }
+  #flash.show { animation: flash 2.6s ease forwards; }
+  #flash .icon { flex: none; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
+                 background: var(--cue); color: #fff; font-size: 26px; }
+  @keyframes flash { 0% { opacity: 0; transform: translate(-50%, 14px) scale(0.96); }
+                     8%, 80% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, 0); } }
   #cues, #cue-log { list-style: none; padding: 0; margin: 0; font-size: 14px; }
   #cues li, #cue-log li { padding: 3px 0; border-top: 1px solid var(--border); }
   .t { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px; }
-  #caption { min-height: 1.5em; margin: 4px 0 0; font-size: 18px; }
+  #caption { min-height: 2.7em; margin: 6px 0 0; font-size: 28px; line-height: 1.35; font-weight: 500; }
   .meter { height: 4px; background: var(--grid); border-radius: 2px; margin-top: 8px; }
   .meter i { display: block; height: 100%; width: 0; background: var(--series); border-radius: 2px; }
   .learn { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -93,21 +120,22 @@
 <body>
 <main>
   <header>
-    <h1>Speechify</h1>
+    <div><h1>Speechify</h1><div class="tagline">the speech coach you wear</div></div>
+    <span class="badge" id="sim-badge" hidden></span>
     <div class="chips" id="chips"></div>
-    <span class="value" id="timer" style="font-size: 22px"></span>
+    <span class="rec" id="timer" hidden></span>
     <button id="go">Start</button>
   </header>
-  <div class="banner" id="sim-banner" hidden></div>
   <div class="banner" id="offline" hidden>Can't reach the Speechify server - is it still running?</div>
+  <div id="flash" hidden></div>
 
-  <section class="grid">
+  <section class="hero">
     <div class="card">
       <div class="label">Pace</div>
       <div class="value" id="wpm">-</div>
       <div class="sub" id="pace-state">words per minute</div>
-      <div class="track"><div class="ideal" id="ideal"></div><div class="needle" id="needle" hidden></div></div>
-      <div class="sub" id="pace-range"></div>
+      <div class="track" id="track"><div class="needle" id="needle" hidden></div></div>
+      <div class="scale"><span>too slow · cooling</span><span>ideal</span><span>too fast · warming</span></div>
     </div>
     <div class="card">
       <div class="label">Filler words</div>
@@ -117,25 +145,27 @@
     <div class="card">
       <div class="label">Where you're looking</div>
       <svg id="room" viewBox="0 0 100 70" role="img" aria-label="Gaze position"></svg>
+      <div class="dwell"><i id="dwell"></i></div>
+      <div class="sub" id="zone">no gaze data</div>
       <div class="sub">● where you look · ○ where your head points</div>
       <button id="center" style="margin-top: 6px">Set straight ahead</button>
-      <div class="sub" id="zone">no gaze data</div>
-    </div>
-    <div class="card">
-      <div class="label">Haptic dots</div>
-      <div class="dots" id="dots"></div>
-      <ol id="cues"></ol>
     </div>
   </section>
 
   <div class="card">
-    <div class="label">Live caption</div>
+    <div class="label">Live transcript</div>
     <p class="sub" id="asked"></p>
     <p id="caption"></p>
     <div class="meter" title="Microphone level"><i id="mic"></i></div>
   </div>
 
   <div class="card">
+    <div class="label">Haptic dots - what the speaker feels</div>
+    <div class="dots" id="dots"></div>
+    <ol id="cues"></ol>
+  </div>
+
+  <div class="card" id="learn-card">
     <h2>Learn the haptic language before you speak</h2>
     <div class="learn" id="learn"></div>
   </div>
@@ -143,7 +173,7 @@
   <section id="report" hidden>
     <h2 style="font-size: 18px">Your last session</h2>
     <p class="sub" id="answered"></p>
-    <p id="compare" style="font-size: 18px; font-weight: 600"></p>
+    <p id="compare" style="font-size: 22px; font-weight: 700"></p>
     <div class="grid" id="tiles"></div>
     <div class="card"><ul id="insights"></ul></div>
     <div class="card">
@@ -191,6 +221,13 @@ const LESSONS = [
 ];
 const ROLES = ["main", "pace", "left", "right"];
 const PACE_MIN = 60, PACE_MAX = 220; // range of the live pace track
+const FILLER_RE = /\b(?:u+m+|u+h+m?|h+m+|erm?|ah|basically|literally)\b|\blike,|\byou know,/gi; // highlighted live
+
+function replay(el, cls) { // restart a CSS animation on an element
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
 
 let next = 0;        // index of the next cue event we haven't shown
 let running = false;
@@ -225,9 +262,9 @@ async function poll() {
 function setup(s) {
   limits = s.limits;
   const pct = (wpm) => (100 * (wpm - PACE_MIN)) / (PACE_MAX - PACE_MIN);
-  $("ideal").style.left = `${pct(limits.ideal[0])}%`;
-  $("ideal").style.width = `${pct(limits.ideal[1]) - pct(limits.ideal[0])}%`;
-  $("pace-range").textContent = `aim for ${limits.ideal[0]}-${limits.ideal[1]}; cue below ${limits.slow} or above ${limits.fast}`;
+  // Cold (too slow) -> green (ideal) -> hot (too fast): the same story the pace dot tells.
+  $("track").style.background = `linear-gradient(90deg, var(--cold) ${pct(limits.slow)}%, var(--good) ${pct(limits.ideal[0])}%, `
+    + `var(--good) ${pct(limits.ideal[1])}%, var(--hot) ${pct(limits.fast)}%)`;
   // The "room": x = degrees left/right of your audience, y = degrees up/down. 0,0 is where you calibrated.
   const x = (az) => az + 50, y = (el) => 30 - el;
   $("room").innerHTML = `
@@ -244,10 +281,11 @@ function setup(s) {
     const button = e.target.closest("button");
     if (button) api(`/api/haptics/${button.dataset.kind}`, "POST");
   };
-  $("dots").innerHTML = ROLES.map((role) => `<div class="dot"><span id="dot-${role}"></span>${role}</div>`).join("");
-  if (s.sim) {
-    $("sim-banner").hidden = false;
-    $("sim-banner").textContent = `Simulation mode (--sim ${s.sim}): the ${s.sim === "all" ? "glasses and speech are" : s.sim + " is"} simulated, not real sensor data.`;
+  $("dots").innerHTML = ROLES.map((role) =>
+    `<div class="dot"><span id="dot-${role}"></span>${role}<div class="sub" id="temp-${role}"></div></div>`).join("");
+  if (s.sim) {  // honesty for the judges: say what isn't real sensor data
+    $("sim-badge").hidden = false;
+    $("sim-badge").textContent = `SIMULATED ${s.sim === "all" ? "GLASSES + SPEECH" : s.sim.toUpperCase()}`;
   }
 }
 
@@ -262,10 +300,12 @@ function renderStatus(s) {
   $("chips").innerHTML = chips.map(([name, text]) =>
     `<span class="chip ${bad.test(text) ? "warn" : ""}">${name}: ${esc(text)}</span>`).join("");
   $("mic").style.width = st.mic_db == null ? "0" : `${Math.max(0, Math.min(100, (st.mic_db + 60) * 2))}%`;
-  $("caption").textContent = st.caption || "";
+  $("caption").innerHTML = esc(st.caption || "").replace(FILLER_RE, "<mark>$&</mark>");
   $("go").textContent = running ? "Stop" : "Start";
   $("go").classList.toggle("stop", running);
-  $("timer").textContent = running ? clock(s.live.elapsed) : "";
+  $("timer").hidden = !running;
+  $("timer").textContent = clock(s.live.elapsed);
+  $("learn-card").hidden = $("center").hidden = running; // setup controls only before a session
 }
 
 function renderLive(live) {
@@ -276,7 +316,10 @@ function renderLive(live) {
     const pct = (100 * (live.wpm - PACE_MIN)) / (PACE_MAX - PACE_MIN);
     $("needle").style.left = `${Math.max(0, Math.min(100, pct))}%`;
   }
-  $("fillers").textContent = live.fillers;
+  if ($("fillers").textContent !== String(live.fillers)) {
+    $("fillers").textContent = live.fillers;
+    replay($("fillers"), "pop");
+  }
   // Place the gaze dot and the head ring in the "room" (degrees left/right and up/down).
   for (const [id, angles] of [["gaze", live.gaze], ["head", live.head]]) {
     const mark = $(id);
@@ -287,8 +330,13 @@ function renderLive(live) {
       mark.setAttribute("cy", Math.max(2, Math.min(68, 30 - angles[1])));
     }
   }
+  // The bar fills while you look away; the dot buzzes when it's full (2 s up/down, 5 s to a side).
+  const limit = { down: limits.up_down_s, up: limits.up_down_s, left: limits.side_s, right: limits.side_s }[live.zone];
+  $("dwell").style.width = limit ? `${Math.min(live.zone_s / limit, 1) * 100}%` : "0";
+  $("dwell").classList.toggle("full", Boolean(limit) && live.zone_s >= limit);
   const where = live.zone ? `looking ${live.zone === "center" ? "at the audience" : live.zone}` : "no gaze data";
-  $("zone").textContent = live.calibrated ? where : `${where} - not calibrated, press "Set straight ahead"`;
+  const timing = limit ? ` · ${live.zone_s.toFixed(1)}s of ${limit}s` : "";
+  $("zone").textContent = (live.calibrated ? where : `${where} (not calibrated yet)`) + timing;
 }
 
 function showCue(e) {
@@ -297,14 +345,28 @@ function showCue(e) {
   li.innerHTML = `<span class="t">${e.t == null ? "practice" : clock(e.t)}</span>${ICONS[e.kind] || ""} ${esc(e.text)}`;
   $("cues").prepend(li);
   while ($("cues").children.length > 6) $("cues").lastChild.remove();
-  // Mirror what the physical dots do: LED color + a shake.
+
+  // A big flash, so everyone watching sees each buzz the speaker feels.
+  const color = e.color ? `rgb(${e.color})` : "var(--series)";
+  $("flash").style.setProperty("--cue", color);
+  $("flash").innerHTML = `<span class="icon">${ICONS[e.kind] || "•"}</span>
+    <span>${esc(e.text)}<div class="sub">felt on the ${e.role === "all" ? "dots" : `${e.role} dot`}</div></span>`;
+  $("flash").hidden = false;
+  replay($("flash"), "show");
+
+  // Mirror what the physical dots do: LED color, a shake, and warming / cooling.
   for (const role of e.role === "all" ? ROLES : [e.role]) {
     const span = $(`dot-${role}`);
     if (!span) continue;
-    span.style.background = e.color ? `rgb(${e.color})` : "";
-    span.classList.remove("buzz");
-    void span.offsetWidth; // restart the animation
-    span.classList.add("buzz");
+    span.style.background = e.color ? color : "";
+    span.style.setProperty("--cue", color);
+    replay(span, "buzz");
+    if (e.thermal != null) {  // the real dot switches its thermal off after limits.thermal_s
+      const temp = $(`temp-${role}`);
+      temp.textContent = e.thermal > 0 ? "🔥 warming" : e.thermal < 0 ? "❄️ cooling" : "";
+      clearTimeout(temp.timer);
+      temp.timer = setTimeout(() => (temp.textContent = ""), limits.thermal_s * 1000);
+    }
   }
 }
 

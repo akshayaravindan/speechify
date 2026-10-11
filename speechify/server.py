@@ -113,7 +113,8 @@ def state(since: int = 0):
     return {
         "sim": SIM,
         "limits": {"fast": config.TOO_FAST_WPM, "slow": config.TOO_SLOW_WPM, "ideal": config.IDEAL_WPM,
-                   "side": config.SIDE_DEG, "down": config.LOOK_DOWN_DEG, "up": config.LOOK_UP_DEG},
+                   "side": config.SIDE_DEG, "down": config.LOOK_DOWN_DEG, "up": config.LOOK_UP_DEG,
+                   "up_down_s": config.UP_DOWN_S, "side_s": config.SIDE_S, "thermal_s": config.THERMAL_MAX_S},
         "status": status,
         "dots": haptics.role_addresses(),
         "live": coach.live(time.monotonic()),
