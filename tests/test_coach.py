@@ -38,27 +38,51 @@ def started_coach():
     return coach, cues
 
 
-def look(coach, t_from, t_to, pitch=0.0, yaw=0.0):
-    """Hold the head at pitch/yaw (eyes straight ahead) from t_from to t_to."""
+def look(coach, t_from, t_to, pitch=0.0, yaw=0.0, eyes=(0.0, 0.0)):
+    """Hold the head at pitch/yaw, with the eyes turned eyes=(right, up) degrees within the head."""
+    x = EYES_AHEAD[0] + eyes[0] / DEG_PER_PX
+    y = EYES_AHEAD[1] - eyes[1] / DEG_PER_PX
     t = t_from
     while t < t_to:
         coach.on_head(t, pitch, yaw)
-        coach.on_gaze(t, *EYES_AHEAD, worn=True)
+        coach.on_gaze(t, x, y, worn=True)
         coach.tick(t)
         t += 0.02
 
 
 def test_looking_down_cues_after_sustain():
     coach, cues = started_coach()
-    look(coach, 2, 4, pitch=-35)
-    assert "look_up" not in cues  # 2 s of looking down is fine
-    look(coach, 4, 5.5, pitch=-35)
+    look(coach, 2, 3.5, pitch=-35)
+    assert "look_up" not in cues  # a 1.5 s glance at notes is fine
+    look(coach, 3.5, 5, pitch=-35)
     assert "look_up" in cues
 
 
-def test_stuck_on_one_side_nudges_the_other_way():
+def test_turning_across_the_room_is_fine_but_dwelling_on_one_side_is_not():
     coach, cues = started_coach()
-    look(coach, 2, 11.5, yaw=40)  # facing right
+    for i in range(5):  # 20 s of turning between both sides of the room, 2 s on each
+        look(coach, 2 + 4 * i, 4 + 4 * i, yaw=-45)
+        look(coach, 4 + 4 * i, 6 + 4 * i, yaw=45)
+    assert "look_left" not in cues and "look_right" not in cues
+    look(coach, 22, 26, yaw=45)  # then stays on the right side (since t=20)
+    assert "look_left" in cues
+
+
+def test_looking_up_too_long_gets_the_same_double_tap():
+    coach, cues = started_coach()
+    look(coach, 2, 4.5, pitch=30)  # staring at the ceiling while thinking
+    assert "look_down" in cues
+
+
+def test_head_bowed_over_notes_counts_even_if_eyes_look_up():
+    coach, cues = started_coach()
+    look(coach, 2, 5.5, pitch=-35, eyes=(0, 35))  # head down at the notes, eyes peeking up at the audience
+    assert "look_up" in cues
+
+
+def test_head_turned_away_counts_even_if_eyes_look_back():
+    coach, cues = started_coach()
+    look(coach, 2, 8, yaw=40, eyes=(-40, 0))  # head turned right, eyes straining back to the middle
     assert "look_left" in cues
 
 

@@ -8,8 +8,8 @@ You can't read a screen while you're presenting, so the feedback is haptic. Each
 |---|---|---|---|
 | Saying "um", "uh", "like," | AssemblyAI live transcript | one crisp tick | main |
 | 3+ fillers within 5 s | AssemblyAI live transcript | one strong buzz: pause and breathe | main |
-| Reading notes / looking down > 2.5 s | Neon gaze + head pitch | double-double tap | main |
-| Facing one side of the room > 8 s | Neon gaze + head yaw | nudge on the *other* side | left / right |
+| Head or eyes down at notes (or up at the ceiling) > 2 s | Neon gaze + head pitch | double-double tap | main |
+| Facing one side of the room > 5 s | Neon gaze + head yaw | nudge toward the *other* side | left / right |
 | Rushing (> 170 WPM) | transcript timing | fading wave + **warming** | pace |
 | Dragging (< 105 WPM) | transcript timing | swelling wave + **cooling** | pace |
 
@@ -29,7 +29,7 @@ python -m speechify --sim glasses   # real mic + transcription, fake glasses
 python -m speechify             # everything real
 ```
 
-The dashboard opens at http://localhost:8000. Press **Start**, look at your audience during the 3-second countdown (that calibrates "straight ahead"), and talk. Press **Stop** for the report. Anything simulated is labeled SIMULATED on the dashboard.
+The dashboard opens at http://localhost:8000. Press **Start**, look at your audience during the 3-second countdown (that calibrates "straight ahead"), and talk. To check the glasses before a session, use **Set straight ahead** (same countdown) - until then the gaze view isn't calibrated. Press **Stop** for the report. Anything simulated is labeled SIMULATED on the dashboard.
 
 ### Hardware checklist
 
@@ -58,7 +58,7 @@ or fakes of both (simulator.py) --'                       '----> dashboard (web/
 | `speechify/server.py` | FastAPI server and wiring |
 | `speechify/web/index.html` | The dashboard (plain HTML/JS, no build step) |
 
-Where you're looking = where your head points (IMU) + where your eyes point within your head (gaze pixel converted to degrees), measured relative to the calibration at Start.
+Where you're looking = where your head points (IMU) + where your eyes point within your head (gaze pixel converted to degrees), measured relative to the calibration at Start. Your head alone counts too: a head bowed over notes is "down" even if your eyes peek up, and a head turned to one side counts as that side. The dashboard shows both: the dot is where you look, the ring is where your head points.
 
 ## Debugging
 

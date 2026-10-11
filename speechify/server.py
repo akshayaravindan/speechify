@@ -122,6 +122,14 @@ def state(since: int = 0):
     }
 
 
+@app.post("/api/calibrate")
+def calibrate():
+    """Whatever you looked at for the last 2 s becomes "straight ahead" (Start does this too)."""
+    if not coach.calibrate(time.monotonic()):
+        raise HTTPException(409, "no gaze data - are the glasses on?")
+    return {"calibrated": True}
+
+
 @app.post("/api/start")
 async def start(answer: bool = False):
     """Start a session. answer=true means you're answering the audience question."""

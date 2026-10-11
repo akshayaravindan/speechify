@@ -2,8 +2,8 @@
 (there are only two Neons at the venue). The dashboard labels these SIMULATED.
 
 Within each session the fake speaker rushes from 18-38s and drags from 48-66s,
-and the fake glasses read notes from 12-17s and stare right from 38-49s, so
-every cue fires at a predictable time.
+and the fake glasses read notes from 12-17s and face the right side of the room
+from 38-46s, so every cue fires at a predictable time.
 """
 
 from __future__ import annotations
@@ -35,8 +35,8 @@ async def fake_glasses(coach) -> None:
             target = (0.0, 0.0)  # before a session: face the audience, so calibration is clean
         elif 12 <= t < 17:
             target = (0.0, -30.0)  # reading notes
-        elif 38 <= t < 49:
-            target = (35.0, 0.0)  # stuck on the right side of the room
+        elif 38 <= t < 46:
+            target = (45.0, 0.0)  # facing the right side of the room
         elif now >= next_glance:  # otherwise scan around the audience
             target = (random.choice([-32.0, -10.0, 0.0, 0.0, 10.0, 32.0]), random.uniform(-4, 4))
             next_glance = now + random.uniform(1.5, 3.5)

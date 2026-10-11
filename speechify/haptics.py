@@ -27,6 +27,7 @@ PATTERNS = {
     "filler":     ("main",  [4],                          (255, 130, 0), None),
     "filler_burst": ("main", [14],                        (255, 0, 160), None),
     "look_up":    ("main",  [10, pause(0.2), 10],         (0, 90, 255),  None),
+    "look_down":  ("main",  [10, pause(0.2), 10],         (0, 90, 255),  None),  # same feel: eyes back to the audience
     "look_left":  ("left",  [86, 24, pause(0.08), 24],    (160, 0, 255), None),
     "look_right": ("right", [86, 24, pause(0.08), 24],    (160, 0, 255), None),
     "too_fast":   ("pace",  [70],                         (255, 50, 0),  HEAT),

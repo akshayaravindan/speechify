@@ -16,9 +16,9 @@ from dataclasses import dataclass
 
 from .config import (
     FILLER_BURST_COOLDOWN_S, FILLER_BURST_COUNT, FILLER_BURST_WINDOW_S,
-    FILLER_COOLDOWN_S, IDEAL_WPM, LOOK_DOWN_DEG, LOOK_DOWN_REMIND_S, LOOK_DOWN_S, LOOK_UP_DEG,
-    PACE_REMIND_S, PACE_SUSTAIN_S, PACE_WINDOW_S, SIDE_DEG, STUCK_SIDE_REMIND_S, STUCK_SIDE_S,
-    TOO_FAST_WPM, TOO_SLOW_WPM,
+    FILLER_COOLDOWN_S, IDEAL_WPM, LOOK_DOWN_DEG, LOOK_UP_DEG,
+    PACE_REMIND_S, PACE_SUSTAIN_S, PACE_WINDOW_S, SIDE_DEG, SIDE_REMIND_S, SIDE_S,
+    TOO_FAST_WPM, TOO_SLOW_WPM, UP_DOWN_REMIND_S, UP_DOWN_S,
 )
 
 # Neon scene camera: 1600x1200 px covering ~103x77 degrees. It points slightly
@@ -60,11 +60,13 @@ class Coach:
         self.on_cue = on_cue
         self.head = None  # latest (t, pitch, yaw)
         self.gaze = None  # smoothed (azimuth, elevation), degrees from the calibrated "audience"
+        self.head_dir = (0.0, 0.0)  # where just your head points, same units
         self.gaze_t = 0.0
         self.zone = None  # "center" | "left" | "right" | "down" | "up" | None (no gaze)
         self.zone_since = 0.0
         self.recent = deque(maxlen=600)  # raw (t, eye_az, eye_el, pitch, yaw) for calibration
         self.calibration = {"eye_az": 0.0, "eye_el": CAMERA_TILT_DEG, "pitch": 0.0, "yaw": None}
+        self.calibrated = False  # until then, "straight ahead" is just the first head reading
         self.active = False
         self._reset(0.0)
 
@@ -111,6 +113,7 @@ class Coach:
             "pitch": sum(s[3] for s in with_head) / len(with_head) if with_head else 0.0,
             "yaw": with_head[-1][4] if with_head else None,  # latest heading (averaging breaks at +-180)
         }
+        self.calibrated = True
         self.gaze = None
         return True
 
@@ -132,26 +135,32 @@ class Coach:
             _, pitch, yaw = self.head
         self.recent.append((t, eye_az, eye_el, pitch, yaw))
 
-        # Where you look = where your head points + where your eyes point within your head.
+        # Where your head points, relative to calibration (0, 0 without IMU data).
         cal = self.calibration
-        az = eye_az - cal["eye_az"]
-        el = eye_el - cal["eye_el"]
+        head_az = head_el = 0.0
         if pitch is not None and cal["yaw"] is not None:
-            az += wrap_degrees(yaw - cal["yaw"])
-            el += pitch - cal["pitch"]
+            head_az = wrap_degrees(yaw - cal["yaw"])
+            head_el = pitch - cal["pitch"]
+        self.head_dir = (head_az, head_el)
 
+        # Where you look = where your head points + where your eyes point within your head.
+        az = eye_az - cal["eye_az"] + head_az
+        el = eye_el - cal["eye_el"] + head_el
         if self.gaze is None or t - self.gaze_t > 0.5:
             self.gaze = (az, el)
         else:  # light smoothing: raw gaze jitters sample to sample
             self.gaze = (self.gaze[0] + 0.1 * (az - self.gaze[0]), self.gaze[1] + 0.1 * (el - self.gaze[1]))
         az, el = self.gaze
-        if el < LOOK_DOWN_DEG:
+
+        # Your eyes OR your head crossing a line counts: a head bowed over notes is
+        # "down" even if your eyes peek up, and a head turned to one side is that side.
+        if el < LOOK_DOWN_DEG or head_el < LOOK_DOWN_DEG:
             zone = "down"
         elif el > LOOK_UP_DEG:
             zone = "up"
-        elif az < -SIDE_DEG:
+        elif az < -SIDE_DEG or head_az < -SIDE_DEG:
             zone = "left"
-        elif az > SIDE_DEG:
+        elif az > SIDE_DEG or head_az > SIDE_DEG:
             zone = "right"
         else:
             zone = "center"
@@ -214,10 +223,16 @@ class Coach:
         zone = self.current_zone(now)
         held = now - self.zone_since
 
-        if zone == "down" and held >= LOOK_DOWN_S and now - self.last_cue["look_up"] >= LOOK_DOWN_REMIND_S:
-            self._cue(now, "look_up", f"Looking down for {held:.0f}s - eyes up to your audience")
+        # Up and down are strict: a couple of seconds away from the audience gets a double tap.
+        if zone in ("down", "up") and held >= UP_DOWN_S and now - self.last_cue["up_down"] >= UP_DOWN_REMIND_S:
+            self.last_cue["up_down"] = now
+            if zone == "down":
+                self._cue(now, "look_up", f"Looking down for {held:.0f}s - head and eyes up to your audience")
+            else:
+                self._cue(now, "look_down", f"Looking up for {held:.0f}s - eyes back to your audience")
 
-        if zone in ("left", "right") and held >= STUCK_SIDE_S and now - self.last_cue["side"] >= STUCK_SIDE_REMIND_S:
+        # Left/right is lenient: turning across the room is natural, dwelling on one side isn't.
+        if zone in ("left", "right") and held >= SIDE_S and now - self.last_cue["side"] >= SIDE_REMIND_S:
             other = "right" if zone == "left" else "left"
             self.last_cue["side"] = now
             self._cue(now, f"look_{other}", f"Facing {zone} for {held:.0f}s - include the {other} side")
@@ -259,12 +274,14 @@ class Coach:
         zone = self.current_zone(now)
         return {
             "active": self.active,
+            "calibrated": self.calibrated,
             "elapsed": round((now if self.active else self.t_end) - self.t0),
             "wpm": round(self.wpm) if self.active and self.wpm else None,
             "pace": self.pace,
             "fillers": sum(1 for w in self.words if w.filler) + self.turn_fillers,
             "zone": zone,
             "gaze": [round(self.gaze[0], 1), round(self.gaze[1], 1)] if zone and self.gaze else None,
+            "head": [round(self.head_dir[0], 1), round(self.head_dir[1], 1)] if zone else None,
         }
 
     def report(self) -> dict:

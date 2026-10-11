@@ -50,6 +50,7 @@
   #room rect.down { fill: var(--warning); fill-opacity: 0.12; stroke: none; }
   #room text { fill: var(--muted); font-size: 4px; }
   #room circle { fill: var(--series); stroke: var(--surface); stroke-width: 0.8; }
+  #room circle#head { fill: none; stroke: var(--ink-2); stroke-width: 0.7; }
   .dots { display: flex; gap: 14px; margin: 4px 0 10px; }
   .dot { text-align: center; font-size: 12px; color: var(--ink-2); }
   .dot span { display: block; width: 30px; height: 30px; margin: 0 auto 3px; border-radius: 50%;
@@ -116,6 +117,8 @@
     <div class="card">
       <div class="label">Where you're looking</div>
       <svg id="room" viewBox="0 0 100 70" role="img" aria-label="Gaze position"></svg>
+      <div class="sub">● where you look · ○ where your head points</div>
+      <button id="center" style="margin-top: 6px">Set straight ahead</button>
       <div class="sub" id="zone">no gaze data</div>
     </div>
     <div class="card">
@@ -176,11 +179,11 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const ICONS = { filler: "💬", filler_burst: "‼", look_up: "↑", look_left: "←", look_right: "→", too_fast: "»", too_slow: "«", pace_ok: "✓", start: "▶", stop: "■" };
+const ICONS = { filler: "💬", filler_burst: "‼", look_up: "↑", look_down: "↓", look_left: "←", look_right: "→", too_fast: "»", too_slow: "«", pace_ok: "✓", start: "▶", stop: "■" };
 const LESSONS = [
   ["filler", "Filler word", "one crisp tick"],
   ["filler_burst", "Filler streak", "strong buzz: pause and breathe"],
-  ["look_up", "Eyes up", "double-double tap"],
+  ["look_up", "Eyes back to the audience", "double-double tap"],
   ["look_left", "Look left", "nudge on the left dot"],
   ["look_right", "Look right", "nudge on the right dot"],
   ["too_fast", "Slow down", "fading wave + warming"],
@@ -233,6 +236,7 @@ function setup(s) {
     <text x="2" y="6">left</text><text x="88" y="6">right</text>
     <text x="${x(0) - 6}" y="${y(limits.up) - 2}">audience</text>
     <text x="${x(0) - 8}" y="67">notes / floor</text>
+    <circle id="head" r="4.5" cx="50" cy="30" visibility="hidden"/>
     <circle id="gaze" r="2.6" cx="50" cy="30" visibility="hidden"/>`;
   $("learn").innerHTML = LESSONS.map(([kind, name, feel]) =>
     `<button data-kind="${kind}">${ICONS[kind]} ${name} <span class="sub">${feel}</span></button>`).join("");
@@ -273,14 +277,18 @@ function renderLive(live) {
     $("needle").style.left = `${Math.max(0, Math.min(100, pct))}%`;
   }
   $("fillers").textContent = live.fillers;
-  const dot = $("gaze");
-  if (dot && live.gaze) {
-    const [az, el] = live.gaze;
-    dot.setAttribute("cx", Math.max(2, Math.min(98, az + 50)));
-    dot.setAttribute("cy", Math.max(2, Math.min(68, 30 - el)));
+  // Place the gaze dot and the head ring in the "room" (degrees left/right and up/down).
+  for (const [id, angles] of [["gaze", live.gaze], ["head", live.head]]) {
+    const mark = $(id);
+    if (!mark) continue;
+    mark.setAttribute("visibility", angles ? "visible" : "hidden");
+    if (angles) {
+      mark.setAttribute("cx", Math.max(2, Math.min(98, angles[0] + 50)));
+      mark.setAttribute("cy", Math.max(2, Math.min(68, 30 - angles[1])));
+    }
   }
-  if (dot) dot.setAttribute("visibility", live.gaze ? "visible" : "hidden");
-  $("zone").textContent = live.zone ? `looking ${live.zone === "center" ? "at the audience" : live.zone}` : "no gaze data";
+  const where = live.zone ? `looking ${live.zone === "center" ? "at the audience" : live.zone}` : "no gaze data";
+  $("zone").textContent = live.calibrated ? where : `${where} - not calibrated, press "Set straight ahead"`;
 }
 
 function showCue(e) {
@@ -302,19 +310,33 @@ function showCue(e) {
 
 // ---------------------------------------------------------------- start / stop
 
+// Whatever you look at during the countdown becomes "straight ahead" (gaze calibration),
+// so you aren't looking down at this screen when it's measured.
+async function countdown() {
+  for (const n of [3, 2, 1]) {
+    $("overlay").hidden = false;
+    $("overlay").textContent = `Look at your audience... ${n}`;
+    await sleep(1000);
+  }
+  $("overlay").hidden = true;
+}
+
+$("center").onclick = async () => {
+  await countdown();
+  try {
+    await api("/api/calibrate", "POST");
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
 async function toggle() {
   $("go").disabled = true;
   try {
     if (running) {
       renderReport(await api("/api/stop", "POST"));
     } else {
-      // Whatever you look at during the countdown becomes "the audience" (gaze calibration).
-      for (const n of [3, 2, 1]) {
-        $("overlay").hidden = false;
-        $("overlay").textContent = `Look at your audience... ${n}`;
-        await sleep(1000);
-      }
-      $("overlay").hidden = true;
+      await countdown();
       const { calibrated } = await api("/api/start", "POST");
       $("report").hidden = true;
       $("cues").innerHTML = "";
